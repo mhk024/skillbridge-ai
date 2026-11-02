@@ -25,3 +25,4 @@ data/ml/raw/
 .DS_Store
 Thumbs.db
 .streamlit/secrets.toml
+data/ml/synthetic_attempts.*
