@@ -1,5 +1,7 @@
 """Small shared helpers."""
 
+from datetime import datetime, timezone
+
 
 def normalize_output(text: str) -> str:
     """Normalize program output for comparison.
@@ -11,3 +13,10 @@ def normalize_output(text: str) -> str:
     while lines and lines[-1] == "":
         lines.pop()
     return "\n".join(lines)
+
+
+def utc_to_local_str(value: datetime | None, fmt: str = "%d %b %Y, %H:%M") -> str:
+    """Show a naive-UTC database timestamp in the server's local time zone."""
+    if value is None:
+        return ""
+    return value.replace(tzinfo=timezone.utc).astimezone().strftime(fmt)

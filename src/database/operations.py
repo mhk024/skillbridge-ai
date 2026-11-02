@@ -179,3 +179,59 @@ def get_user_submissions(
     if limit:
         stmt = stmt.limit(limit)
     return list(session.scalars(stmt))
+
+
+
+# ------------------------------------------------- assessment helpers (Phase 4B)
+def get_open_assessment(session: Session, user_id: int) -> Assessment | None:
+    """The user's most recent unfinished assessment, if any."""
+    return session.scalar(
+        select(Assessment)
+        .where(Assessment.user_id == user_id, Assessment.completed_at.is_(None))
+        .order_by(Assessment.started_at.desc(), Assessment.id.desc())
+        .limit(1)
+    )
+
+
+def get_attempted_question_ids(session: Session, user_id: int) -> set[str]:
+    return set(
+        session.scalars(
+            select(Submission.question_id).where(Submission.user_id == user_id).distinct()
+        )
+    )
+
+
+def get_solved_question_ids(session: Session, user_id: int) -> set[str]:
+    return set(
+        session.scalars(
+            select(Submission.question_id)
+            .where(Submission.user_id == user_id, Submission.is_correct.is_(True))
+            .distinct()
+        )
+    )
+
+
+def get_question_submissions(
+    session: Session, user_id: int, question_id: str
+) -> list[Submission]:
+    """This user's attempts on one question, newest first."""
+    return list(
+        session.scalars(
+            select(Submission)
+            .where(Submission.user_id == user_id, Submission.question_id == question_id)
+            .order_by(Submission.submitted_at.desc(), Submission.id.desc())
+        )
+    )
+
+
+def get_assessment_progress(session: Session, assessment_id: int, user_id: int) -> dict:
+    assessment = get_assessment_for_user(session, assessment_id, user_id)
+    if assessment is None:
+        raise AccessDeniedError("Assessment not found for this user.")
+    attempted = {s.question_id for s in assessment.submissions}
+    solved = {s.question_id for s in assessment.submissions if s.is_correct}
+    return {
+        "attempts": len(assessment.submissions),
+        "attempted": len(attempted),
+        "solved": len(solved),
+    }

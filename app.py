@@ -65,6 +65,11 @@ else:
                 default=True,
             ),
             st.Page(
+                "views/assessment.py",
+                title="Coding Assessment",
+                icon=":material/code:",
+            ),
+            st.Page(
                 "views/settings.py",
                 title="Profile and Settings",
                 icon=":material/settings:",
