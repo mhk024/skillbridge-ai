@@ -1,0 +1,27 @@
+# Virtual environment
+.venv/
+venv/
+
+# Secrets
+.env
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Runtime data (generated, not source)
+data/*.db
+*.db
+*.sqlite3
+models/*.joblib
+
+# Large downloaded datasets (keep small samples/scripts only)
+data/ml/raw/
+
+# Editors / OS
+.vscode/
+.DS_Store
+Thumbs.db
+.streamlit/secrets.toml
