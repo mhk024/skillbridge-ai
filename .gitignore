@@ -26,3 +26,5 @@ data/ml/raw/
 Thumbs.db
 .streamlit/secrets.toml
 data/ml/synthetic_attempts.*
+models/*.json
+models/*.tmp

@@ -5,7 +5,9 @@ from sqlalchemy.orm import Session
 
 from src.database.models import (
     ASSESSMENT_MODES,
+    DATASET_TYPES,
     Assessment,
+    ModelMetadata,
     Question,
     SchemaVersion,
     Submission,
@@ -235,3 +237,52 @@ def get_assessment_progress(session: Session, assessment_id: int, user_id: int) 
         "attempted": len(attempted),
         "solved": len(solved),
     }
+
+
+# ------------------------------------------------------------- ML model registry
+def register_model(
+    session: Session,
+    *,
+    model_version: str,
+    algorithm: str,
+    trained_at,
+    dataset_name: str,
+    dataset_type: str,
+    n_train: int,
+    n_test: int,
+    metrics: dict,
+) -> ModelMetadata:
+    """Record a trained model and make it the single active one."""
+    if dataset_type not in DATASET_TYPES:
+        raise ValueError(f"dataset_type must be one of {DATASET_TYPES}")
+    if session.scalar(
+        select(ModelMetadata).where(ModelMetadata.model_version == model_version)
+    ) is not None:
+        raise ValueError(f"Model version already registered: {model_version}")
+    for old in session.scalars(
+        select(ModelMetadata).where(ModelMetadata.is_active.is_(True))
+    ).all():
+        old.is_active = False
+    row = ModelMetadata(
+        model_version=model_version,
+        algorithm=algorithm,
+        trained_at=trained_at,
+        dataset_name=dataset_name,
+        dataset_type=dataset_type,
+        n_train=n_train,
+        n_test=n_test,
+        metrics_json=metrics,
+        is_active=True,
+    )
+    session.add(row)
+    session.flush()
+    return row
+
+
+def get_active_model_metadata(session: Session) -> ModelMetadata | None:
+    return session.scalar(
+        select(ModelMetadata)
+        .where(ModelMetadata.is_active.is_(True))
+        .order_by(ModelMetadata.trained_at.desc())
+        .limit(1)
+    )

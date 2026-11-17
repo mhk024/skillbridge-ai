@@ -14,8 +14,21 @@ from src.database.connection import session_scope
 from src.utils.config import get_settings
 from src.utils.helpers import utc_to_local_str
 from src.utils.ui import difficulty_badge, page_header, tag_chips, topic_badge
+from src.ml.predict import (
+    TRAIN_COMMAND,
+    ModelUnavailableError,
+    load_model,
+    model_file_mtime,
+    predict_for_next_attempt,
+)
 
 logger = logging.getLogger("skillbridge")
+
+
+@st.cache_resource(show_spinner=False)
+def _cached_model(file_stamp: float):
+    """Load the model once per model-file version (the stamp is the cache key)."""
+    return load_model()
 
 STARTER_CODE = (
     "# Read input with input() and print your answer with print().\n"
@@ -206,6 +219,34 @@ else:
                 right.caption(f"Example {i}: output")
                 right.code(ex["output"] or "(empty)", language=None)
         st.markdown(tag_chips(view["tags"]), unsafe_allow_html=True)
+        # ---- ML estimate: made BEFORE this attempt, from your earlier saved attempts only
+    predicted_prob = None
+    model_version = None
+    stamp = model_file_mtime()
+    if stamp is None:
+        st.caption(f"ML estimate unavailable: no trained model yet. Train one with `{TRAIN_COMMAND}`.")
+    else:
+        try:
+            model = _cached_model(stamp)
+            with session_scope() as session:
+                predicted_prob = predict_for_next_attempt(
+                    session, model, user_id=user_id, question_id=qid,
+                    topic=view["topic"], difficulty=view["difficulty"],
+                )
+            model_version = model.version
+            st.info(f"Estimated chance you solve this on your next attempt: **{predicted_prob:.0%}**")
+            if model.dataset_type == "synthetic":
+                st.caption(
+                    "This model was trained on SYNTHETIC (simulated) data, so treat the number "
+                    f"as a demonstration, not a measurement of you. Model: {model.version}"
+                )
+            else:
+                st.caption(f"Model: {model.version}")
+        except ModelUnavailableError as exc:
+            st.caption(f"ML estimate unavailable: {exc}")
+        except Exception:
+            logger.exception("Prediction failed")
+            st.caption("ML estimate unavailable right now.")
 
     # ------------------------------------------------------------------ the editor
     code_key = f"code_{assessment_id}_{qid}"
@@ -238,6 +279,8 @@ else:
                         question_id=qid,
                         code=code,
                         evaluation=evaluation,
+                        predicted_prob=predicted_prob,
+                        model_version=model_version,
                     )
                     saved = {"attempt": sub.attempt_number, "correct": sub.is_correct}
             except Exception:
